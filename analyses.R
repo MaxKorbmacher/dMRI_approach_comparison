@@ -6,7 +6,7 @@
 #
 #
 # DEFINE PATH FOR DATA AND OUTPUT
-PATH = "/Users/max/Library/CloudStorage/OneDrive-HøgskulenpåVestlandet/Documents/Projects/WMM_Approaches_comparison/"
+PATH = "your/data/path/
 # create subdir called Figures [prompts warning and skips, if folder exists already]
 dir.create(file.path(PATH, "Figures"))
 #
