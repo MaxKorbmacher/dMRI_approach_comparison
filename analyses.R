@@ -301,46 +301,71 @@ plot6 = ggplot(tmp, aes(x=Approach, y=B, color = Data)) +
   coord_flip() + theme_bw() + xlab("Diffusion Approach") + ylab("Adjusted absolute standardized beta coefficients") + theme(text = element_text(size=15))
 ggsave(paste(PATH,"Figures/plot6.pdf",sep=""),plot6,width=8,height=7)
 #
-# 3.3) Associations of the PCs with global/skeleton DTI metrics ####
+# 3.3) Associations of the PCs with global/skeleton metrics ####
 # estimate corrected correlations, standard errors and p-values
-cors = function(data,mean_data){ #data argument is for the data frame containing tract-level data, mean_data for skeleton-level data
+cors = function(data){ # mean_data ... data argument is for the data frame containing tract-level data, mean_data for skeleton-level data
   dkipc = data %>% select(starts_with("rk"), starts_with("ak"), starts_with("mk")) %>% prcomp(scale. = T, center = T)
   dtipc =  data %>% select(starts_with("rd"), starts_with("ad"), starts_with("md"), starts_with("fa")) %>% prcomp(scale. = T, center = T)
   briapc =  data %>% select(starts_with("v_"), starts_with("micro_"), starts_with("Drad"), starts_with("Dax")) %>% prcomp(scale. = T, center = T)
   smtpc =  data %>% select(starts_with("smt_md"), starts_with("smt_long")) %>% prcomp(scale. = T, center = T)
   smtmcpc =  data %>% select(starts_with("smt_mc")) %>% prcomp(scale. = T, center = T)
   wmtipc =  data %>% select(starts_with("axEAD"), starts_with("radEAD")) %>% prcomp(scale. = T, center = T)
-  PC = data.frame(DKI = as.numeric(dkipc$x[,1]), DTI = as.numeric(dtipc$x[,1]), BRIA = as.numeric(briapc$x[,1]), 
-                  SMT = as.numeric(smtpc$x[,1]), SMTmc = as.numeric(smtmcpc$x[,1]), WMTI = as.numeric(wmtipc$x[,1]))
-  PC = data.frame(scale(PC))
-  PC$eid = data$eid
-  predictor_vars = c("ad_Mean","rd_Mean","md_Mean", "FA_Mean")
-  for (n in 1:length(predictor_vars)){
-    mean_data[predictor_vars[n]] = c(scale(mean_data[predictor_vars[n]]))
+  pcdatalist = list(dkipc,dtipc,briapc,smtpc,smtmcpc,wmtipc)
+  PC=list()
+  for (i in 1:5){
+    PC[[i]] = data.frame(DKI = as.numeric(dkipc$x[,i]), DTI = as.numeric(dtipc$x[,i]), BRIA = as.numeric(briapc$x[,i]), 
+                    SMT = as.numeric(smtpc$x[,i]), SMTmc = as.numeric(smtmcpc$x[,i]), WMTI = as.numeric(wmtipc$x[,i]))
+    PC[[i]] = data.frame(scale(PC[[i]]))
+    PC[[i]]$eid = data$eid
+    PC[[i]] = merge(data,PC[[i]])
   }
-  PC = merge(mean_data,PC)
+  # for (n in 1:length(predictor_vars)){
+  #   mean_data[predictor_vars[n]] = c(scale(mean_data[predictor_vars[n]]))
+  # }
   WMMapproach = c("BRIA","DKI", "DTI", "SMT", "SMTmc", "WMTI")
   B = SE = p = c()
-  export = list()
-  for (j in 1:length(predictor_vars)){
-    for (i in 1:length(WMMapproach)){
-      #f1 = formula(paste(WMMapproach[i],"~DTI+age+sex+(1|scanner)",sep="")) # singulary issues using lmer 
-      f1 = formula(paste(WMMapproach[i],"~",predictor_vars[j],"+age+sex+(scanner)",sep=""))
-      mod = lm(f1,PC)
-      B[i] = summary(mod)$coefficients[2,1]
-      SE[i] = summary(mod)$coefficients[2,2]
-      p[i] = summary(mod)$coefficients[2,4]
+  ex = export = list()
+  for (i in 1:length(WMMapproach)){
+    predictor_vars = rownames(pcdatalist[[i]]$rotation)
+    for (j in 1:length(predictor_vars)){
+      for (l in 1:length(PC)){
+        f1 = formula(paste(WMMapproach[i],"~",predictor_vars[j],"+age+sex+(scanner)",sep=""))
+        mod = lm(f1,PC[[l]])
+        B[l] = summary(mod)$coefficients[2,1]
+        SE[l] = summary(mod)$coefficients[2,2]
+        p[l] = summary(mod)$coefficients[2,4]
+        Comp[l] = l
+      }
+      export[[j]] = data.frame(B,SE,p,Comp)
+      export[[j]]$Variable = predictor_vars[j]
+      export[[j]]$Approach = WMMapproach[i]
+      names(export[[j]]) = c("B", "SE","p","Comp","Variable")
     }
-    export[[j]] = data.frame(B,SE,p)
-    names(export[[j]]) = c("B", "SE","p")
-    rownames(export[[j]]) = WMMapproach
+    ex[[i]] = rbindlist(export)
+    #rownames(export[[j]]) = WMMapproach
   }
-  names(export)=predictor_vars
-  return(export)
+  names(ex)=WMMapproach
+  return(ex)
 }
-ukblist = cors(ukb,ukb_mean)
-abcdlist = cors(abcd,abcd_mean)
-datlist = cors(dat,dat_mean)
+ukblist = cors(ukb)
+abcdlist = cors(abcd)
+datlist = cors(dat)
+corrected_cors_ukb = rbindlist(ukblist)
+corrected_cors_abcd = rbindlist(abcdlist)
+corrected_cors_both = rbindlist(datlist)
+write.csv(x=corrected_cors_ukb, file=paste(PATH,"corrected_loadings_ukb.csv",sep=""))
+write.csv(x=corrected_cors_abcd, file=paste(PATH,"corrected_loadings_abcd.csv",sep=""))
+write.csv(x=corrected_cors_both, file=paste(PATH,"corrected_loadings_both.csv",sep=""))
+#
+#
+#
+#
+#
+#
+#
+# Something went wrong saving files. Code might hence be corrupted from here for plotting
+# (Plotting and results in preprint are correct. Code from here onwards appears however to be a previous version.)
+#
 plt_list = list()
 for (i in 1:length(ukblist)){
   tmp = rbind(ukblist[[i]], abcdlist[[i]], datlist[[i]])
@@ -363,7 +388,7 @@ statcheck = function(dflist){
   }
 }
 print("Checking the associations between DTI skeleton-level metrics and PCs of the different approaches")
-print("In UKb:")
+print("In UKB:")
 statcheck(ukblist)
 print("In ABCD")
 statcheck(abcdlist)
