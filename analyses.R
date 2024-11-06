@@ -350,9 +350,9 @@ cors = function(data){ # mean_data ... data argument is for the data frame conta
 ukblist = cors(ukb)
 abcdlist = cors(abcd)
 datlist = cors(dat)
-corrected_cors_ukb = rbindlist(ukblist)
-corrected_cors_abcd = rbindlist(abcdlist)
-corrected_cors_both = rbindlist(datlist)
+corrected_cors_ukb = data.frame(rbindlist(ukblist))
+corrected_cors_abcd = data.frame(rbindlist(abcdlist))
+corrected_cors_both = data.frame(rbindlist(datlist))
 write.csv(x=corrected_cors_ukb, file=paste(PATH,"corrected_loadings_ukb.csv",sep=""))
 write.csv(x=corrected_cors_abcd, file=paste(PATH,"corrected_loadings_abcd.csv",sep=""))
 write.csv(x=corrected_cors_both, file=paste(PATH,"corrected_loadings_both.csv",sep=""))
@@ -365,6 +365,11 @@ write.csv(x=corrected_cors_both, file=paste(PATH,"corrected_loadings_both.csv",s
 #
 # Something went wrong saving files. Code might hence be corrupted from here for plotting
 # (Plotting and results in preprint are correct. Code from here onwards appears however to be a previous version.)
+#
+#
+#
+#
+#
 #
 plt_list = list()
 for (i in 1:length(ukblist)){
