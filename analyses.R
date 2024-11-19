@@ -328,6 +328,7 @@ cors = function(data){ # mean_data ... data argument is for the data frame conta
   for (i in 1:length(WMMapproach)){
     predictor_vars = rownames(pcdatalist[[i]]$rotation)
     for (j in 1:length(predictor_vars)){
+      Comp=c()
       for (l in 1:length(PC)){
         f1 = formula(paste(WMMapproach[i],"~",predictor_vars[j],"+age+sex+(scanner)",sep=""))
         mod = lm(f1,PC[[l]])
@@ -347,9 +348,9 @@ cors = function(data){ # mean_data ... data argument is for the data frame conta
   names(ex)=WMMapproach
   return(ex)
 }
-ukblist = cors(ukb)
-abcdlist = cors(abcd)
-datlist = cors(dat)
+ukblist = cors(ukb %>% mutate(across(where(is.numeric), scale)))
+abcdlist = cors(abcd %>% mutate(across(where(is.numeric), scale)))
+datlist = cors(dat %>% mutate(across(where(is.numeric), scale)))
 corrected_cors_ukb = data.frame(rbindlist(ukblist))
 corrected_cors_abcd = data.frame(rbindlist(abcdlist))
 corrected_cors_both = data.frame(rbindlist(datlist))
