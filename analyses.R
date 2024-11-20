@@ -322,7 +322,7 @@ cors = function(data){ # mean_data ... data argument is for the data frame conta
   # for (n in 1:length(predictor_vars)){
   #   mean_data[predictor_vars[n]] = c(scale(mean_data[predictor_vars[n]]))
   # }
-  WMMapproach = c("BRIA","DKI", "DTI", "SMT", "SMTmc", "WMTI")
+  WMMapproach = c("DKI", "DTI","BRIA", "SMT", "SMTmc", "WMTI")
   B = SE = p = c()
   ex = export = list()
   for (i in 1:length(WMMapproach)){
@@ -330,7 +330,7 @@ cors = function(data){ # mean_data ... data argument is for the data frame conta
     for (j in 1:length(predictor_vars)){
       Comp=c()
       for (l in 1:length(PC)){
-        f1 = formula(paste(WMMapproach[i],"~",predictor_vars[j],"+age+sex+(scanner)",sep=""))
+        f1 = formula(paste(WMMapproach[i],"~",predictor_vars[j],"+age+sex+scanner",sep=""))
         mod = lm(f1,PC[[l]])
         B[l] = summary(mod)$coefficients[2,1]
         SE[l] = summary(mod)$coefficients[2,2]
@@ -372,36 +372,36 @@ write.csv(x=corrected_cors_both, file=paste(PATH,"corrected_loadings_both.csv",s
 #
 #
 #
-plt_list = list()
-for (i in 1:length(ukblist)){
-  tmp = rbind(ukblist[[i]], abcdlist[[i]], datlist[[i]])
-  tmp$Approach = row.names(ukblist[[i]])
-  tmp$Data = c(replicate(nrow(tmp)/3,"UKB"),replicate(nrow(tmp)/3,"ABCD"),replicate(nrow(tmp)/3,"Both"))
-  tmp$B = abs(tmp$B)
-  plt_list[[i]] = ggplot(tmp, aes(x=Approach, y=B, color = Data)) +
-    geom_errorbar(aes(ymin=B-SE, ymax=B+SE,group=Data), width=.2,position=position_dodge(.6)) +
-    geom_point(position = position_dodge(width = 0.6))+
-    scale_color_manual(values=c("#880700", "#E69F00", "#3a81b5"))+ ##999999','#E69F00', '#56B4E9'
-    coord_flip() + theme_bw() + theme(text = element_text(size=15)) + ylab("")+xlab("")+ylim(0.25,1.3)
-}
-plot7 = ggarrange(plotlist = plt_list, common.legend = T, legend = "right", labels = c("AD", "RD", "MD", "FA"))
-plot7 = annotate_figure(plot7, left = text_grob("Diffusion Approach", rot = 90), bottom = text_grob("Adjusted Absolute Standardized Beta Coefficients"))
-ggsave(paste(PATH,"Figures/plot7.pdf",sep=""),plot7,width=8,height=7)
-# have a quick look at the stats for each data set
-statcheck = function(dflist){
-  for (i in 1:length(dflist)){
-    print(paste(names(dflist)[i]," Mean = ",mean(abs(dflist[[names(dflist)[i]]]$B))," ± ",sd(abs(dflist[[names(dflist)[i]]]$B)),sep=""))
-  }
-}
-print("Checking the associations between DTI skeleton-level metrics and PCs of the different approaches")
-print("In UKB:")
-statcheck(ukblist)
-print("In ABCD")
-statcheck(abcdlist)
-print("In combined data:")
-statcheck(datlist)
-rm(ukblist,abcdlist,datlist,plt_list)
-#
+# plt_list = list()
+# for (i in 1:length(ukblist)){
+#   tmp = rbind(ukblist[[i]], abcdlist[[i]], datlist[[i]])
+#   tmp$Approach = row.names(ukblist[[i]])
+#   tmp$Data = c(replicate(nrow(tmp)/3,"UKB"),replicate(nrow(tmp)/3,"ABCD"),replicate(nrow(tmp)/3,"Both"))
+#   tmp$B = abs(tmp$B)
+#   plt_list[[i]] = ggplot(tmp, aes(x=Approach, y=B, color = Data)) +
+#     geom_errorbar(aes(ymin=B-SE, ymax=B+SE,group=Data), width=.2,position=position_dodge(.6)) +
+#     geom_point(position = position_dodge(width = 0.6))+
+#     scale_color_manual(values=c("#880700", "#E69F00", "#3a81b5"))+ ##999999','#E69F00', '#56B4E9'
+#     coord_flip() + theme_bw() + theme(text = element_text(size=15)) + ylab("")+xlab("")+ylim(0.25,1.3)
+# }
+# plot7 = ggarrange(plotlist = plt_list, common.legend = T, legend = "right", labels = c("AD", "RD", "MD", "FA"))
+# plot7 = annotate_figure(plot7, left = text_grob("Diffusion Approach", rot = 90), bottom = text_grob("Adjusted Absolute Standardized Beta Coefficients"))
+# ggsave(paste(PATH,"Figures/plot7.pdf",sep=""),plot7,width=8,height=7)
+# # have a quick look at the stats for each data set
+# statcheck = function(dflist){
+#   for (i in 1:length(dflist)){
+#     print(paste(names(dflist)[i]," Mean = ",mean(abs(dflist[[names(dflist)[i]]]$B))," ± ",sd(abs(dflist[[names(dflist)[i]]]$B)),sep=""))
+#   }
+# }
+# print("Checking the associations between DTI skeleton-level metrics and PCs of the different approaches")
+# print("In UKB:")
+# statcheck(ukblist)
+# print("In ABCD")
+# statcheck(abcdlist)
+# print("In combined data:")
+# statcheck(datlist)
+# rm(ukblist,abcdlist,datlist,plt_list)
+# #
 # 4) Tract-level associations (within-tract associations) ####
 # to automatically detect all tracts there are in the data, we take one of the three data frames (containing identical tracts and tract labels!)
 tract_names = abcd%>%select(contains("smt_mc_intra_"))%>%names
