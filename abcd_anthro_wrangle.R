@@ -23,10 +23,11 @@ anthro$height=anthro$height*2.54
 anthro$weight = anthro$weight*0.45359237
 anthro$BMI=anthro$weight/((anthro$height/100)^2)
 anthro=anthro%>% select(-c(weight, height))
+eth=eth%>%filter(eventname=="baseline_year_1_arm_1")
 eth=eth %>% select(src_subject_id,race_ethnicity)
 names(eth)=c("eid","ethnicity")
 antrho=merge(eth,anthro,by="eid")
-write.csv(anthro, "/cluster/projects/p33/users/maxk/wm_ica/abcd_anthro.csv", row.names = F)
+write.csv(antrho, "/cluster/projects/p33/users/maxk/wm_ica/abcd_anthro.csv", row.names = F)
 #
 #
 #
