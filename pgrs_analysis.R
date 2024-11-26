@@ -15,6 +15,48 @@ pacman::p_load(ggplot2, fastICA, reshape2, ggpubr,
                lmerTest, graphics,rlist,pwr,
                viridis,cowplot,effsize,
                update = F)
+# make some functions
+simple_range_extracter <- function(p, scale) {
+  d <- ggplot_build(p)
+  d$plot$scales$get_scales(scale$aesthetics)$range$range
+}
+get_shared_scale <- function(..., scale) {
+  plots <- list(...)
+  ranges <- purrr::map(plots, ~simple_range_extracter(., scale))
+  single_range <- range(unlist(ranges))
+  scale$limits <- single_range
+  scale
+}
+# Main function
+set_scale_union <- function(..., scale) {
+  exprs <- rlang::enexprs(...)
+  scale <- get_shared_scale(..., scale = scale)
+  var_nms <- purrr::map_chr(exprs, rlang::as_name)
+  edit_plots_in_place(var_nms, env = parent.frame(),
+                      scale = scale)
+  # Invisibly return the scale, in case you need it later
+  invisible(scale)
+}
+
+# Sub-function
+edit_plots_in_place <- function(names, env, scale) {
+  vars <- rlang::env_has(env = env, nms = names)
+  if (!all(vars))
+    stop("Environment does not have variables for ",
+         paste(names(vars[!vars]), collapse=", "))
+  purrr:::walk(names, function(nm) {
+    og_plot <- rlang::env_get(env, nm = nm)
+    message("Changing plot `", nm, "`")
+    # Muffles messages about already having scales
+    withCallingHandlers(
+      assign(x = nm, envir = env,
+             value = og_plot + scale),
+      message = function(err) {
+        if (grepl("already present", err$message))
+          invokeRestart("muffleMessage")
+      })
+  })
+}
 # load data
 ## tract
 ukb = read.csv(paste(PATH,"ukb_dat.csv",sep=""))
@@ -82,96 +124,107 @@ write.csv(x = ds,file = paste(PATH,"Tables/diff_pgrs.csv",sep=""))
 # mean(unlist(pgrs[[l]][pgrs_names][i])) # for ref of the direction of effects. This is the population.
 # mean(unlist(PC[[l]][pgrs_names][i])) # This is the imaging sample
 #
+# PGRS PC
+pgrs_names = (pgrs[[1]]%>%names)[2:7]
+pgrs_comp = pgrs[[1]][pgrs_names]%>% prcomp(scale. = T, center = T)
+fviz_eig(pgrs_comp, main = "UKB Psych PC", addlabels=TRUE, hjust = -0.3,linecolor ="red") + theme_minimal() + ylim(0,100)
+pgrs_comp = pgrs[[2]][pgrs_names]%>% prcomp(scale. = T, center = T)
+fviz_eig(pgrs_comp, main = "ABCD Psych PC", addlabels=TRUE, hjust = -0.3,linecolor ="red") + theme_minimal() + ylim(0,100)
 #
 #
 #
 #
-# Now, we start with looking at the associations between the PC of the psychiatric disorder | AD PGRS (y) ~ skeleton average/mean scores
-pgrs_names=c("psypc1","AD")
+# Now, we start with looking at the associations between the PGRS (y) ~ skeleton average/mean scores
+pgrs_names=(pgrs[[1]]%>%names)[2:length(pgrs[[1]]%>%names)]
 skeleton_metrics=PC[[1]]%>%select(contains("_Mean"))%>%names
-res=list() # empty list to be filled by loop
+res=res02=list() # empty list to be filled by loop
 for (i in 1:length(PC)){
-  res1=data.frame(matrix(ncol=length(skeleton_metrics), nrow=length(pgrs_names)))
+  res1=res2=data.frame(matrix(ncol=length(skeleton_metrics), nrow=length(pgrs_names)))
   for (j in 1:length(skeleton_metrics)){
-    res11 = c()
+    res22 = res11 = c()
     for (k in 1:length(pgrs_names)){
       f1=formula(paste(pgrs_names[k],"~scale(",skeleton_metrics[j],")+age+sex+scanner+ethnicity",sep="")) # formula for skeleton mean associations
       m=lm(f1,data=PC[[i]])
       res11[k] = summary(m)$coefficients[2]
+      res22[k] =summary(m)$coefficients[2,4]
     }
     res1[,j] = res11
+    res2[,j] = res22
   }
-  res[[i]] = res1
-  names(res[[i]])=skeleton_metrics
-  row.names(res[[i]])=pgrs_names
+  res[[i]] = res1 # beta coefficients
+  res02[[i]] = res2 # p-values
+  names(res02[[i]])=names(res[[i]])=skeleton_metrics
+  row.names(res02[[i]])=row.names(res[[i]])=pgrs_names
 }
-res = list.rbind(res)
-names(res) = c("BRIA-Vintra", "BRIA-vextra", "BRIA-vCSF", "BRIA-microRD", "BRIA-microFA", 
+res = list.rbind(res) # beta coefficients
+res02 = list.rbind(res02) # p-values
+names(res02) = names(res) = c("BRIA-Vintra", "BRIA-vextra", "BRIA-vCSF", "BRIA-microRD", "BRIA-microFA", 
          "BRIA-microAX", "BRIA-microADC", "BRIA-DRADextra", "BRIA-DAXintra", "BRIA-DAXextra",
          "DKI-MK", "DKI-RK", "DKI-AK", 
          "DTI-FA","DTI-MD","DTI-RD","DTI-AD",
          "SMT-long", "SMT-MD", "SMTmc-intra", "SMTmc-extraMD", "SMTmc-extratrans",
          "SMTmc-Diff", "WMTI-axEAD", "WMTI-AWF", "WMTI-radEAD")
-res$Group = c("UKB-PsyPC","UKB-AD","ABCD-PsyPC","ABCD-AD")
+res02$Group = res$Group = c(paste("UKB-",rownames(res02)[1:(length(pgrs_names))],sep=""),paste("ABCD-",rownames(res02)[1:(length(pgrs_names))],sep=""))# c("UKB-PsyPC","UKB-AD","ABCD-PsyPC","ABCD-AD")
 res=melt(res)
+res02=melt(res02)
+res02$cor_p = res02$value*708
+res02%>%filter(cor_p<.05) # show the metrics that survived multiple comparison
 names(res)=c("Group","Metric","Beta")
-
 p1 = ggplot(res, aes(x=Group, y=Metric)) + 
   geom_tile(colour="black", size=0.25, aes(fill=Beta)) +
   scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white",
-                       breaks = c(-0.04, -0.02, 0, 0.02, 0.04)) +
+                       breaks = c(-0.02,-0.01, 0,0.01, 0.02)) +
   geom_text(aes(label = round(Beta,3)))+
   theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
-p1
-ggsave(paste(PATH,"Figures/pgrs_skeleton.pdf",sep=""),p1,width=10,height=5)
-
-
-
-
-
+ggsave(paste(PATH,"Figures/pgrs_skeleton.pdf",sep=""),p1,width=14,height=8)
+#
+#
+#
+#
+#
 # Second, we look at how the first five PCs of WM tracts associate with PGRS PCs
-tracts = names(tracts[[1]]%>%select(-eid,-sex,-scanner,-age)) # use these names to then loop over data frames to get the first 5 PCs
-#diffusion_components=names(PC[[1]])[2:7] # now, not needed anymore
-
-res=list() # empty list to be filled by loop
+#tracts = names(tracts[[1]]%>%select(-eid,-sex,-scanner,-age)) # use these names to then loop over data frames to get the first 5 PCs
+diffusion_components=names(PC[[1]])[2:7]
+res02=res=list() # empty list to be filled by loop
 for (i in 1:length(PC)){
-  res1=data.frame(matrix(ncol=length(skeleton_metrics), nrow=length(pgrs_names)))
-  for (j in 1:length(skeleton_metrics)){
-    res11 = c()
+  res2=res1=data.frame(matrix(ncol=length(diffusion_components), nrow=length(pgrs_names)))
+  for (j in 1:length(diffusion_components)){
+    res11 = res22 = c()
     for (k in 1:length(pgrs_names)){
-      f1=formula(paste(pgrs_names[k],"~scale(",skeleton_metrics[j],")+age+sex+scanner+ethnicity",sep="")) # formula for skeleton mean associations
+      f1=formula(paste(pgrs_names[k],"~scale(",diffusion_components[j],")+age+sex+scanner+ethnicity",sep="")) # formula for skeleton mean associations
       m=lm(f1,data=PC[[i]])
       res11[k] = summary(m)$coefficients[2]
+      res22[k] =summary(m)$coefficients[2,4]
     }
     res1[,j] = res11
+    res2[,j] = res22
   }
+  names(res2)=names(res1)=diffusion_components
+  res2$PGRS = res1$PGRS = pgrs_names
   res[[i]] = res1
+  res02[[i]] = res2
 }
-res
-
-
-
-
-
-# Plot #### (WORK IN PROGRESS)
-for (i in 1:length(res2)){
-  res2[[i]]$dependent = deps
-  res2[[i]] = melt(res2[[i]]%>%select(!contains("SE"))) %>% rename(Beta = value)
-}
-p1 = ggplot(res2[[1]], aes(x=variable, y=dependent)) + 
+#res # 1) UKB, 2) ABCD
+r1=melt(res[[1]])
+r2=melt(res[[2]])
+names(r1) = names(r2) = c("PGRS","variable","Beta")
+p1=ggplot((r1), aes(x=variable, y=PGRS)) + 
   geom_tile(colour="black", size=0.25, aes(fill=Beta)) +
   scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white",
-                       breaks = c(-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75)) +
+                       breaks = c(-0.02, -0.015, -0.01,-0.005, 0)) +
+  geom_text(aes(label = round(Beta,3)))+
   theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
-p2 = ggplot(res2[[2]], aes(x=variable, y=dependent)) + 
+p1 = annotate_figure(p1, top = text_grob("UKB", rot = 0))
+p2=ggplot((r2), aes(x=variable, y=PGRS)) + 
   geom_tile(colour="black", size=0.25, aes(fill=Beta)) +
   scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white",
-                       breaks = c(-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75)) +
+                       breaks = c(-0.0075,-0.005,-0.0025, 0, 0.0025, 0.005,0.0075)) +
+  geom_text(aes(label = round(Beta,3)))+
   theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
-p3 = ggplot(res2[[3]], aes(x=variable, y=dependent)) + 
-  geom_tile(colour="black", size=0.25, aes(fill=Beta)) +
-  scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white",
-                       breaks = c(-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75)) +
-  theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
-plot2 = ggarrange(p1,p2,p3,nrow=1,labels = c("a", "b", "c"), common.legend = T, legend = "right") #c("UKB", "ABCD", "Both")
-ggsave(paste(PATH,"Figures/plot2.pdf",sep=""),plot2,width=9,height=7)
+p2 = annotate_figure(p2, top = text_grob("ABCD", rot = 0))
+p3 = ggarrange(p1,p2,common.legend = F)
+ggsave(paste(PATH,"Figures/PGRS_WM_PC.pdf",sep=""),p3,width=12,height=4)
+#
+# check sig
+melt(res02[[1]]) %>% filter(value<.05/708)
+melt(res02[[2]]) %>% filter(value<.05/708)
