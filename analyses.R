@@ -381,12 +381,12 @@ ggsave(paste(PATH,"Figures/plot6.pdf",sep=""),plot6,width=8,height=7)
 # 3.3) Associations of the PCs with global/skeleton metrics ####
 # estimate corrected correlations, standard errors and p-values
 cors = function(data){ # mean_data ... data argument is for the data frame containing tract-level data, mean_data for skeleton-level data
-  dkipc = data %>% select(starts_with("rk"), starts_with("ak"), starts_with("mk")) %>% prcomp(scale. = T, center = T)
-  dtipc =  data %>% select(starts_with("rd"), starts_with("ad"), starts_with("md"), starts_with("fa")) %>% prcomp(scale. = T, center = T)
-  briapc =  data %>% select(starts_with("v_"), starts_with("micro"), starts_with("Drad"), starts_with("Dax")) %>% prcomp(scale. = T, center = T)
-  smtpc =  data %>% select(starts_with("smt_md"), starts_with("smt_long")) %>% prcomp(scale. = T, center = T)
-  smtmcpc =  data %>% select(starts_with("smt_mc")) %>% prcomp(scale. = T, center = T)
-  wmtipc =  data %>% select(starts_with("axEAD"), starts_with("radEAD"),starts_with("awf")) %>% prcomp(scale. = T, center = T)
+  dkipc = data %>% select(starts_with("rk"), starts_with("ak"), starts_with("mk")) %>% prcomp(scale. = F, center = F)
+  dtipc =  data %>% select(starts_with("rd"), starts_with("ad"), starts_with("md"), starts_with("fa")) %>% prcomp(scale. = F, center = F)
+  briapc =  data %>% select(starts_with("v_"), starts_with("micro"), starts_with("Drad"), starts_with("Dax")) %>% prcomp(scale. = F, center = F)
+  smtpc =  data %>% select(starts_with("smt_md"), starts_with("smt_long")) %>% prcomp(scale. = F, center = F)
+  smtmcpc =  data %>% select(starts_with("smt_mc")) %>% prcomp(scale. = F, center = F)
+  wmtipc =  data %>% select(starts_with("axEAD"), starts_with("radEAD"),starts_with("awf")) %>% prcomp(scale. = F, center = F)
   pcdatalist = list(dkipc,dtipc,briapc,smtpc,smtmcpc,wmtipc)
   PC=list()
   for (i in 1:5){
@@ -559,12 +559,56 @@ abcd_pcm = pcmf(abcd)
 ukb_pcm = pcmf(ukb)
 ###### THEN PREDICT IN THE TEST SET (get loadings)
 # these individual level component scores or loadings can then be used as to predict things, such as sex and age
+#
+# Note that the predict.pcrcomp() or simply predict() call has the scaling based on the original model included
+# Hence, the scaling done above resulting in the lists abcd_pc_val, and ukb_pc_val is not necessary
+#
 abcd_test_loadings = ukb_test_loadings = list()
 for (i in 1:length(abcd_pcm)){
-  abcd_test_loadings[[i]] = data.frame(predict(abcd_pcm[[i]], newdata = abcd_pc_val[[i]]))[1:5]
-  ukb_test_loadings[[i]] = data.frame(predict(ukb_pcm[[i]], newdata = ukb_pc_val[[i]]))[1:5]
+  abcd_test_loadings[[i]] = data.frame(predict(abcd_pcm[[i]], newdata = abcd_val))[1:5]
+  ukb_test_loadings[[i]] = data.frame(predict(ukb_pcm[[i]], newdata = ukb_val))[1:5]
 }
 #
+# We have already estimated the corrected correlations between single variables and PCs for the training set.
+# Now, we do it for the test set to validate the associations
+cors = function(data, data_pc_val, data_test_loadings){ # mean_data ... data argument is for the data frame containing tract-level data, mean_data for skeleton-level data
+  PC=list()
+  for (i in 1:5){
+    PC[[i]] = cbind(data %>% select(age,sex,scanner,CortexVol), data_test_loadings[[i]],data_pc_val)
+  }
+  WMMapproach = c("BRIA","DKI", "DTI", "SMT", "SMTmc", "WMTI")
+  ex=list()
+  for (i in 1:length(WMMapproach)){
+    predictor_vars = names(data_pc_val[[i]])
+    export = list()
+    for (j in 1:length(predictor_vars)){
+      Comp=c()
+      B = SE = p = c()
+      for (l in 1:length(PC)){
+        f1 = formula(paste("PC",l,"~",predictor_vars[j],"+age+sex+scanner+CortexVol",sep=""))
+        mod = lm(f1,PC[[l]])
+        B[l] = summary(mod)$coefficients[2,1]
+        SE[l] = summary(mod)$coefficients[2,2]
+        p[l] = summary(mod)$coefficients[2,4]
+        Comp[l] = l
+      }
+      export[[j]] = data.frame(B,SE,p,Comp)
+      export[[j]]$Variable = predictor_vars[j]
+      export[[j]]$Approach = WMMapproach[i]
+      names(export[[j]]) = c("B", "SE","p","Comp","Variable","Approach")
+    }
+    ex[[i]] = rbindlist(export)
+    #rownames(export[[j]]) = WMMapproach
+  }
+  names(ex)=WMMapproach
+  return(ex)
+}
+abcd_val_list = cors(abcd_val, abcd_pc_val, abcd_test_loadings) # get test result lists
+ukb_val_list = cors(abcd_val, abcd_pc_val, abcd_test_loadings)
+ukb_val_list = data.frame(rbindlist(ukb_val_list)) # put them into data frame format
+abcd_val_list = data.frame(rbindlist(abcd_val_list))
+write.csv(x=ukb_val_list, file=paste(PATH,"corrected_loadings_ukb_TEST.csv",sep="")) # save
+write.csv(x=abcd_val_list, file=paste(PATH,"corrected_loadings_abcd_TEST.csv",sep=""))
 #
 #
 ### NOW, FINALLY CLASSIFY
@@ -609,7 +653,7 @@ for (i in 1:length(ukb_pc)){
     df = cbind(ukb%>%select(c(eid,age,sex,scanner,CortexVol)),ukb_pc[[i]])
     m = glm(sex~PC1+PC2+PC3+PC4+PC5+CortexVol+age+scanner, family = "binomial", data = df)
     out[[i]] = varImp(m)[1:7,]
-    df = cbind(abcd%>%select(c(eid,age,sex,scanner,CortexVol)),abcd_pc[[i]])
+    df = cbind(abcd%>%select(c(eid,age,sex,scanner,CortexVol)),abcd[[i]])
     m = glm(sex~PC1+PC2+PC3+PC4+PC5+CortexVol+age+scanner, family = "binomial", data = df)
     out2[[i]] = varImp(m)[1:7,]
 }
@@ -634,7 +678,7 @@ cbind(colMeans(list.rbind(out)),colMeans(list.rbind(out2)))
 # varImp(m1)
 #
 #
-# in a second step (and althought the predictions are not great), we can focus on the predictors, which are the peincipal components
+# in a second step, we can focus on the predictors, which are the peincipal components
 # we use a simple function, with three main elements:
 # orig_dat is the original data, which is only used here to extract covariates
 # pc_dat is the data containing the pcs, meaning each diffusion model
@@ -654,66 +698,228 @@ for (i in 1:length(ukb_pc)){
       apply_glm(abcd_mean_val,abcd_test_loadings[[i]],"ABCD Test")))
 }
 # and now, magically transform it all to a cluster of odds ratios
-sex_plots = list()
+sex_plots = sex_plots_val = list()
 for (i in 1:length(ukb_pc)){
 sex_plots[[i]] = ggplot(melt(sex_preds[[i]]) %>% mutate(OR = exp(value)), aes(x=variable, y=Description)) +
   geom_tile(colour="black", size=0.25, aes(fill=OR)) +
   scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 1, mid = "white") +
   #                     breaks = c(0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75)) +
   geom_text(aes(label=round(OR,2)),size=4)+
-  theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
+  theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")+
+  ggtitle(mods[i])
+sex_plots_val[[i]] = ggplot(melt(sex_preds[[i]]) %>% mutate(OR = exp(value)), aes(x=variable, y=Description)) +
+  geom_tile(colour="black", size=0.25, aes(fill=OR)) +
+  scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 1, mid = "white") +
+  #                     breaks = c(0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75)) +
+  geom_text(aes(label=round(OR,2)),size=4)+
+  theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")+
+  ggtitle(mods[i])
 }
-ggarrange(plotlist = sex_plots, common.legend = T)
+sex_plot = ggarrange(plotlist = sex_plots, common.legend = T)
+ggsave(paste(PATH,"Figures/sex_plot.pdf",sep=""),sex_plot,width=11,height=5)
+#
+#
+#
+# Sex by skeleton average classifications
+metric = names(ukb_mean)[5:30]
+datalist = list(ukb_mean, ukb_mean_val, abcd_mean, abcd_mean_val)
+CoefList = list()
+for (j in 1:length(datalist)){
+  data = datalist[[j]]
+  Coefs = list()
+  for (i in 1:length(metric)){
+    m = lm(formula(paste(metric[i],"~sex+age+scanner+CortexVol")),data = data)
+    Name = metric[i]
+    B = (lm.beta::lm.beta(m)$coefficients[2])
+    Coefs[[i]] = data.frame(Name,B)
+  }
+  CoefList[[j]] = list.rbind(Coefs)
+}
+d = data.frame(Name = CoefList[[1]]$Name,UKB = CoefList[[1]]$B, UKB_val = CoefList[[2]]$B, ABCD = CoefList[[3]]$B, ABCD_val = CoefList[[4]]$B)
+d = melt(d)
+ggplot(d, aes(x=variable, y=Name)) +
+  geom_tile(colour="black", size=0.25, aes(fill=value)) +
+  scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white",
+                       breaks = c(-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75)) +
+  geom_text(aes(label=round(value,3)),size=4)+
+  theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
+#
+# do the same on the tract level
+metric = names(ukb %>% dplyr::select(-c(eid,sex,age,scanner,CortexVol,data)))
+datalist = list(ukb, ukb_val, abcd, abcd_val)
+CoefList = list()
+for (j in 1:length(datalist)){
+  data = datalist[[j]]
+  Coefs = list()
+  for (i in 1:length(metric)){
+    m = lm(formula(paste(metric[i],"~sex+age+scanner+CortexVol")),data = data)
+    Name = metric[i]
+    B = (lm.beta::lm.beta(m)$coefficients[2])
+    Coefs[[i]] = data.frame(Name,B)
+  }
+  CoefList[[j]] = list.rbind(Coefs)
+}
+d = data.frame(Name = CoefList[[1]]$Name,UKB = CoefList[[1]]$B, UKB_val = CoefList[[2]]$B, ABCD = CoefList[[3]]$B, ABCD_val = CoefList[[4]]$B)
+#
+# Check which effects replicated in the internal validation sets
+# effects replicated in UKB
+sum(ifelse(d$UKB>0,1,0) == ifelse(d$UKB_val>0,1,0)) / nrow(d)
+# effects replicated in ABCD
+sum(ifelse(d$ABCD>0,1,0) == ifelse(d$ABCD_val>0,1,0)) / nrow(d)
+# effects replicated in both datasets
+sum((ifelse(d$UKB>0,1,0) == ifelse(d$UKB_val>0,1,0)) == (ifelse(d$ABCD>0,1,0) == ifelse(d$ABCD_val>0,1,0)))/nrow(d)
+#
+# check for the strength and replicability of all, hippo and UF effects
+### all
+d %>% summarize(M_UKB = mean(abs(UKB)),M_UKB_val = mean(abs(UKB_val)),
+                                     M_ABCD = mean(abs(ABCD)),M_ABCD_val = mean(abs(ABCD_val)))
+
+### Uncinate fasciculus
+d[grepl("UF",d$Name),] %>% summarize(M_UKB = mean(abs(UKB)),M_UKB_val = mean(abs(UKB_val)),
+                                   M_ABCD = mean(abs(ABCD)),M_ABCD_val = mean(abs(ABCD_val)))
+### hippocampus
+d[grepl("hippocampus",d$Name),] %>% summarize(M_UKB = mean(abs(UKB)),M_UKB_val = mean(abs(UKB_val)),
+                                     M_ABCD = mean(abs(ABCD)),M_ABCD_val = mean(abs(ABCD_val)))
 
 
 
-## POTENTIALLY & MOST LIKELY OBSOLETE:
 
-# res = list()
-# mean_list=list(ukb_mean,abcd_mean)
-# Beta=SE=p=c()
-# for (df in 1:length(mean_list)){
-#   for (i in 1:length(preds)){
-#     tmp_dat = stand(mean_list[[df]])
-#     tmp_dat$age = scale(tmp_dat$age)
-#     f1 = formula(paste("age~",preds[i],"+age+sex+scanner+CortexVol",sep="")) # regular linear models used due to singular fit 
-#     m1 = lm(f1, data=tmp_dat)
-#     Beta[i] = summary(m1)$coefficients[3]
-#     SE[i] = summary(m1)$coefficients[3,2] # not necessary for the plotting
-#     p[i] = summary(m1)$coefficients[3,4]
-#   }
-#   res[[df]] = data.frame(preds, Beta, SE, p)
-# }
-# res[[1]]$Data = "UKB"
-# res[[2]]$Data = "ABCD"
-# plot_dat = list.rbind(res) # merge list/data frames
-# plot_dat$Metric=deps2 # add plotable metric names
-# # split data up into 3 parts for better plotting
-# BRIA.df=dplyr::filter(plot_dat, grepl("BRIA",Metric))
-# DTI.DKI.df = rbind(plot_dat %>% filter(grepl("DKI",Metric)),plot_dat %>% filter(grepl("DTI",Metric)))
-# SMT.WMTI.df = rbind(plot_dat %>% filter(grepl("SMT",Metric)),plot_dat %>% filter(grepl("WMTI",Metric)))
-# res=list(BRIA.df,DTI.DKI.df,SMT.WMTI.df)
-# for (i in 1:length(res)){
-#   res[[i]] = melt(res[[i]]%>%select(-SE,-p,-preds))%>% rename(Beta = value)
-# }
-# p1 = ggplot(res[[1]], aes(x=Data, y=Metric)) +
-#   geom_tile(colour="black", size=0.25, aes(fill=Beta)) +
-#   scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white",
-#                        breaks = c(-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75)) +
-#   geom_text(aes(label=round(Beta,2)),size=4)+
-#   theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
-# p2 = ggplot(res[[2]], aes(x=Data, y=Metric)) +
-#   geom_tile(colour="black", size=0.25, aes(fill=Beta)) +
-#   scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white",
-#                        breaks = c(-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75)) +
-#   geom_text(aes(label=round(Beta,2)),size=4)+
-#   theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
-# p3 = ggplot(res[[3]], aes(x=Data, y=Metric)) +
-#   geom_tile(colour="black", size=0.25, aes(fill=Beta)) +
-#   scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white",
-#                        breaks = c(-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75)) +
-#   geom_text(aes(label=round(Beta,2)),size=4)+
-#   theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
-# #plot10 = ggarrange(p1,p2,p3,nrow=1, common.legend = T, legend = "bottom") #c("UKB", "ABCD", "Both")
-# plot11=plot_grid(p1,p2,p3,nrow=1, align="v")
-# ggsave(paste(PATH,"Figures/plot11.pdf",sep=""),plot11,width=11,height=5)
+# 6. AGE ASSOCIATIONS ####
+age_pred = function(orig_train,orig_test, train_list, test_list, datasource){
+  for (i in 1:length(train_list)){
+    
+    df = cbind(orig_train%>%select(c(eid,age,sex,scanner,CortexVol)),train_list[[i]])
+    m = lm(age~PC1+PC2+PC3+PC4+PC5+CortexVol+sex, data = df)
+    testing = cbind(orig_test%>%select(c(eid,age,sex,scanner,CortexVol)),test_list[[i]])
+    Test = cor(predict(m, newdata=testing),testing$age,use = "pairwise.complete.obs")
+    Train = cor(predict(m, newdata=df),df$age,use = "pairwise.complete.obs")
+    out[[i]] = data.frame(Model = mods[i], round(Train,4), round(Test,4))
+    names(out[[i]]) = c("Model", paste(datasource, "Train"),paste(datasource, "Test"))
+  }
+  return(out)
+}
+age_corrs = merge(list.rbind(age_pred(ukb, ukb_val,ukb_pc,ukb_test_loadings,"UKB")),
+                     list.rbind(age_pred(abcd, abcd_val,abcd_pc,abcd_test_loadings,"ABCD")),
+                     by = "Model"
+)
+write.csv(x = age_corrs,file = paste(PATH,"Tables/age_corrs.csv",sep=""))
+#
+# beta coefficients of principal components
+#
+apply_lm = function(orig_dat,pc_dat,description){
+  df = cbind(orig_dat%>%select(c(eid,age,sex,scanner,CortexVol)),pc_dat)
+  m = lm(age~PC1+PC2+PC3+PC4+PC5+sex+scanner+CortexVol, data = df)
+  d = data.frame(Description = description, Component = names(lm.beta::lm.beta(m)$coefficients[2:6]), 
+                 lm.beta::lm.beta(m)$coefficients[2:6])
+  return(d)
+}
+# all of this can be easily put together:
+age_preds = list() # empty list
+for (i in 1:length(ukb_pc)){
+  age_preds[[i]] = data.frame(Model = mods[i],rbind(apply_lm(ukb,ukb_pc[[i]],"UKB Training"),
+                                                    apply_lm(abcd,abcd_pc[[i]],"ABCD Training"),
+                                                    apply_lm(ukb_mean_val,ukb_test_loadings[[i]],"UKB Test"),
+                                                    apply_lm(abcd_mean_val,abcd_test_loadings[[i]],"ABCD Test")))
+}
+age_plots = list()
+for (i in 1:length(ukb_pc)){
+  age_plots[[i]] = ggplot(melt(age_preds[[i]]) %>% mutate(Beta = value), aes(x=Component, y=Description)) +
+    geom_tile(colour="black", size=0.25, aes(fill=Beta)) +
+    scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white") +
+    #                     breaks = c(0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75)) +
+    geom_text(aes(label=round(Beta,2)),size=4)+
+    theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")+
+    ggtitle(mods[i])
+}
+age_plot = ggarrange(plotlist = age_plots, common.legend = F)
+ggsave(paste(PATH,"Figures/age_plot.pdf",sep=""),age_plot,width=13,height=5)
+
+# small correlations with age might be due to the cortical volume being more age-associated
+apply_lm = function(orig_dat,pc_dat,description){
+  df = cbind(orig_dat%>%select(c(eid,age,sex,scanner,CortexVol)),pc_dat)
+  m = lm(age~CortexVol+PC1+PC2+PC3+PC4+PC5+sex+scanner, data = df)
+  d = data.frame(Description = description, Component = names(lm.beta::lm.beta(m)$coefficients[2]), 
+                 lm.beta::lm.beta(m)$coefficients[2])
+  return(d)
+}
+# all of this can be easily put together:
+age_preds = list() # empty list
+for (i in 1:length(ukb_pc)){
+  age_preds[[i]] = data.frame(Model = mods[i],rbind(apply_lm(ukb,ukb_pc[[i]],"UKB Training"),
+                                                    apply_lm(abcd,abcd_pc[[i]],"ABCD Training"),
+                                                    apply_lm(ukb_mean_val,ukb_test_loadings[[i]],"UKB Test"),
+                                                    apply_lm(abcd_mean_val,abcd_test_loadings[[i]],"ABCD Test")))
+}
+list.rbind(age_preds)
+# Well ...
+# the small correlations in abcd data are not due to confounding cortical volumes
+#
+#
+#
+age_pred = function(orig_train,orig_test, train_list, test_list, datasource){
+  for (i in 1:length(train_list)){
+    df = cbind(orig_train%>%select(c(eid,age,sex,scanner,CortexVol)),train_list[[i]])
+    m = lm(age~PC1+PC2+PC3+PC4+PC5+CortexVol+sex, data = df)
+    testing = cbind(orig_test%>%select(c(eid,age,sex,scanner,CortexVol)),test_list[[i]])
+    Test = MAE(predict(m, newdata=testing),testing$age,na.rm = T)
+    Train = MAE(predict(m, newdata=df),df$age,na.rm = T)
+    out[[i]] = data.frame(Model = mods[i], round(Train,4), round(Test,4))
+    names(out[[i]]) = c("Model", paste(datasource, "Train"),paste(datasource, "Test"))
+  }
+  return(out)
+}
+age_rmse = merge(list.rbind(age_pred(ukb, ukb_val,ukb_pc,ukb_test_loadings,"UKB")),
+                  list.rbind(age_pred(abcd, abcd_val,abcd_pc,abcd_test_loadings,"ABCD")),
+                  by = "Model"
+)
+age_rmse
+
+# Skeleton level age associations
+res = list()
+mean_list=list(ukb_mean,abcd_mean)
+Beta=SE=p=c()
+for (df in 1:length(mean_list)){
+  for (i in 1:length(preds)){
+    tmp_dat = stand(mean_list[[df]])
+    tmp_dat$age = scale(tmp_dat$age)
+    f1 = formula(paste("age~",preds[i],"+age+sex+scanner+CortexVol",sep="")) # regular linear models used due to singular fit
+    m1 = lm(f1, data=tmp_dat)
+    Beta[i] = lm.beta::lm.beta(m1)$coefficients[2]
+    #SE[i] = summary(m1)$coefficients[3,2] # not necessary for the plotting
+    p[i] = summary(m1)$coefficients[2,4]
+  }
+  res[[df]] = data.frame(preds, Beta, p) #SE
+}
+res[[1]]$Data = "UKB"
+res[[2]]$Data = "ABCD"
+plot_dat = list.rbind(res) # merge list/data frames
+plot_dat$Metric=deps2 # add plotable metric names
+# split data up into 3 parts for better plotting
+BRIA.df=dplyr::filter(plot_dat, grepl("BRIA",Metric))
+DTI.DKI.df = rbind(plot_dat %>% filter(grepl("DKI",Metric)),plot_dat %>% filter(grepl("DTI",Metric)))
+SMT.WMTI.df = rbind(plot_dat %>% filter(grepl("SMT",Metric)),plot_dat %>% filter(grepl("WMTI",Metric)))
+res=list(BRIA.df,DTI.DKI.df,SMT.WMTI.df)
+for (i in 1:length(res)){
+  res[[i]] = melt(res[[i]]%>%select(-SE,-p,-preds))%>% rename(Beta = value)
+}
+p1 = ggplot(res[[1]], aes(x=Data, y=Metric)) +
+  geom_tile(colour="black", size=0.25, aes(fill=Beta)) +
+  scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white",
+                       breaks = c(-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75)) +
+  geom_text(aes(label=round(Beta,2)),size=4)+
+  theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
+p2 = ggplot(res[[2]], aes(x=Data, y=Metric)) +
+  geom_tile(colour="black", size=0.25, aes(fill=Beta)) +
+  scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white",
+                       breaks = c(-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75)) +
+  geom_text(aes(label=round(Beta,2)),size=4)+
+  theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
+p3 = ggplot(res[[3]], aes(x=Data, y=Metric)) +
+  geom_tile(colour="black", size=0.25, aes(fill=Beta)) +
+  scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white",
+                       breaks = c(-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75)) +
+  geom_text(aes(label=round(Beta,2)),size=4)+
+  theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
+#plot10 = ggarrange(p1,p2,p3,nrow=1, common.legend = T, legend = "bottom") #c("UKB", "ABCD", "Both")
+plot11=plot_grid(p1,p2,p3,nrow=1, align="v")
+ggsave(paste(PATH,"Figures/age_plot_skeleton.pdf",sep=""),plot11,width=11,height=5)
