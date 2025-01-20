@@ -984,8 +984,8 @@ for (j in 1:length(dflist)){
   for (i in 1:length(left)){
     tmp = data.frame(value = c(unlist(data[left[i]]), unlist(data[right[i]])),
                      hemi = c(replicate(nrow(data),"left"),replicate(nrow(data),"right")))
-    d = cohens_d(formula = value~hemi,data = tmp)$effsize # NOTE: THIS IS LEFT MINUS RIGHT!
-    t = t.test(value~hemi,tmp)$p.value # This is the p-val only
+    d = cohens_d(formula = value~hemi,data = tmp,paired=T)$effsize # NOTE: THIS IS LEFT MINUS RIGHT!
+    t = t.test(unlist(data[left[i]]), unlist(data[right[i]]), paired=T)$p.value # This is the p-val only
     resu[[i]] = data.frame(Name = left[i], Cohens_d = d,p = t)
   }
   the_result[[j]] = resu
@@ -1020,7 +1020,8 @@ ukb_hemi$Tract = ukb_val_hemi$Tract = abcd_hemi$Tract = abcd_val_hemi$Tract =
 plot_hemi = function(title,data_hemi){
     p=ggplot(data_hemi, aes(x=Metric, y=Tract)) +
     geom_tile(colour="black", size=0.25, aes(fill=Cohens_d)) +
-    scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white") +
+    scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, 
+                         mid = "white",name = "Cohen's d") +
     #breaks = c(-1, -0.5, 0, 0.25, 0.5, 1)) +
     geom_text(aes(label=round(Cohens_d,2)),size=4)+
     theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
@@ -1029,4 +1030,24 @@ plot_hemi = function(title,data_hemi){
 }
 hemiplots = list(plot_hemi("UKB  training",ukb_hemi),plot_hemi("UKB validation",ukb_val_hemi),
                  plot_hemi("ABCD training",abcd_hemi),plot_hemi("ABCD validation",abcd_val_hemi))
-ggarrange(plotlist = hemiplots)
+asym = ggarrange(plotlist = hemiplots)
+ggsave(paste(PATH,"Figures/asym.pdf",sep=""),asym,width=26,height=10)
+# assess effect average sizes
+paste("UKB Md = ",round(median(abs(ukb_hemi$Cohens_d)),2),"±",round(mad(abs(ukb_hemi$Cohens_d)),2),sep="")
+paste("UKB validation Md = ",round(median(abs(ukb_val_hemi$Cohens_d)),2),"±",round(mad(abs(ukb_val_hemi$Cohens_d)),2),sep="")
+paste("ABCD Md = ",round(median(abs(abcd_hemi$Cohens_d)),2),"±",round(mad(abs(abcd_hemi$Cohens_d)),2),sep="")
+paste("ABCD validation Md = ",round(median(abs(abcd_val_hemi$Cohens_d)),2),"±",round(mad(abs(abcd_val_hemi$Cohens_d)),2),sep="")
+
+# look at percentages of rigthwards asymmetry
+sum(ifelse(ukb_hemi$Cohens_d<0,1,0))/nrow(ukb_hemi)*100
+sum(ifelse(ukb_val_hemi$Cohens_d<0,1,0))/nrow(ukb_val_hemi)*100
+sum(ifelse(abcd_hemi$Cohens_d<0,1,0))/nrow(ukb_hemi)*100
+sum(ifelse(abcd_val_hemi$Cohens_d<0,1,0))/nrow(ukb_hemi)*100
+
+# one can consider only sufficiently powered differences
+median(ifelse(abs(ukb_hemi$Cohens_d)<0.071,NA,abs(ukb_hemi$Cohens_d)),na.rm = T)
+median(ifelse(abs(abcd_hemi$Cohens_d)<0.186,NA,abs(abcd_hemi$Cohens_d)),na.rm = T)
+#
+#
+#
+print("The end.")

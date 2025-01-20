@@ -332,3 +332,96 @@ ukbl%>%filter(Comp==3 & Approach=="DKI") %>% filter(grepl("CG", Variable) |
 test = abcdl%>%filter(Comp==3 & Approach=="DKI")
 abcdl%>%filter(Comp==3 & Approach=="DKI") %>% filter(grepl("SLF", Variable))%>%
   summarise(mean(abs(B)), sd(abs(B)), median(abs(B)),mad(abs(B)))
+
+
+# Context: AGE ASSOCIATIONS ####
+# Note: besides DKI and SMT, all other PC associations follow a similar patterns as for sex classifications
+# Hence, we examine only DKI and SMT
+# DKI ####
+# in UKB
+test = ukbl%>%filter(Comp==5) %>% filter(Approach =="DKI") %>% mutate(B=abs(B))
+test3 = ukbl_test%>%filter(Comp==5) %>% filter(Approach =="DKI") %>% mutate(B=abs(B))
+test$B = ifelse(test$B > 1, 1, test$B)
+test3$B = ifelse(test3$B > 1, 1, test3$B)
+
+paste("CST=",round(mean(test[grepl("CST", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("CST", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("CST=",round(mean(test3[grepl("CST", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("CST", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+# !
+paste("hippocampus=",round(mean(test[grepl("hippocampus", gsub("0","0",test$Variable)),]$B),2),"±",round(sd(test[grepl("hippocampus", gsub("0","0",test$Variable)),]$B),2),sep = "")
+paste("hippocampus=",round(mean(test3[grepl("hippocampus", gsub("0","0",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("hippocampus", gsub("0","0",test3$Variable)),]$B),2),sep = "")
+paste("ATR=",round(mean(test[grepl("ATR", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("ATR", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("ATR=",round(mean(test3[grepl("ATR", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("ATR", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+paste("CG=",round(mean(test[grepl("CG", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("CG", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("CG=",round(mean(test3[grepl("CG", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("CG", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+#
+#
+#
+# in ABCD
+test = abcdl%>%filter(Comp==5) %>% filter(Approach =="DKI") %>% mutate(B=abs(B))
+test3 = abcdl_test%>%filter(Comp==5) %>% filter(Approach =="DKI") %>% mutate(B=abs(B))
+paste("CST=",round(mean(test[grepl("CST", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("CST", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("CST=",round(mean(test3[grepl("CST", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("CST", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+# !
+paste("hippocampus=",round(mean(test[grepl("hippocampus", gsub("0","0",test$Variable)),]$B),2),"±",round(sd(test[grepl("hippocampus", gsub("0","0",test$Variable)),]$B),2),sep = "")
+paste("hippocampus=",round(mean(test3[grepl("hippocampus", gsub("0","0",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("hippocampus", gsub("0","0",test3$Variable)),]$B),2),sep = "")
+paste("ATR=",round(mean(test[grepl("ATR", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("ATR", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("ATR=",round(mean(test3[grepl("ATR", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("ATR", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+paste("CG=",round(mean(test[grepl("CG", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("CG", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("CG=",round(mean(test3[grepl("CG", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("CG", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+#
+
+test[grepl("FMAJ", test$Variable),]
+test3[grepl("FMAJ", test3$Variable),]
+
+# SMT ####
+# in UKB
+test = ukbl%>%filter(Comp==5) %>% filter(Approach =="SMT") %>% mutate(B=abs(B))
+test3 = ukbl_test%>%filter(Comp==5) %>% filter(Approach =="SMT") %>% mutate(B=abs(B))
+test$B = ifelse(test$B > 1, 1, test$B)
+test3$B = ifelse(test3$B > 1, 1, test3$B)
+paste("UF=",round(mean(test[grepl("UF", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("UF", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("UF=",round(mean(test3[grepl("UF", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("UF", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+#!
+paste("ATR=",round(mean(test[grepl("ATR", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("ATR", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("ATR=",round(mean(test3[grepl("ATR", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("ATR", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+paste("CST=",round(mean(test[grepl("CST", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("CST", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("CST=",round(mean(test3[grepl("CST", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("CST", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+paste("CG=",round(mean(test[grepl("CG", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("CG", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("CG=",round(mean(test3[grepl("CG", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("CG", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+paste("hippocampus=",round(mean(test[grepl("hippocampus", gsub("0","0",test$Variable)),]$B),2),"±",round(sd(test[grepl("hippocampus", gsub("0","0",test$Variable)),]$B),2),sep = "")
+paste("hippocampus=",round(mean(test3[grepl("hippocampus", gsub("0","0",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("hippocampus", gsub("0","0",test3$Variable)),]$B),2),sep = "")
+
+test[grepl("FMAJ", test$Variable),]
+test3[grepl("FMAJ", test3$Variable),]
+
+test[grepl("FMIN", test$Variable),]
+test3[grepl("FMIN", test3$Variable),]
+#
+# ABCD
+test = abcdl%>%filter(Comp==2) %>% filter(Approach =="SMT") %>% mutate(B=abs(B))
+test3 = abcdl_test%>%filter(Comp==2) %>% filter(Approach =="SMT") %>% mutate(B=abs(B))
+test$B = ifelse(test$B > 1, 1, test$B)
+test3$B = ifelse(test3$B > 1, 1, test3$B)
+paste("UF=",round(mean(test[grepl("UF", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("UF", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("UF=",round(mean(test3[grepl("UF", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("UF", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+#!
+paste("ATR=",round(mean(test[grepl("ATR", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("ATR", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("ATR=",round(mean(test3[grepl("ATR", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("ATR", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+paste("CST=",round(mean(test[grepl("CST", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("CST", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("CST=",round(mean(test3[grepl("CST", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("CST", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+paste("CG=",round(mean(test[grepl("CG", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),"±",round(sd(test[grepl("CG", gsub("CG_hippocampus","not_relevant",test$Variable)),]$B),2),sep = "")
+paste("CG=",round(mean(test3[grepl("CG", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("CG", gsub("CG_hippocampus","not_relevant",test3$Variable)),]$B),2),sep = "")
+paste("hippocampus=",round(mean(test[grepl("hippocampus", gsub("0","0",test$Variable)),]$B),2),"±",round(sd(test[grepl("hippocampus", gsub("0","0",test$Variable)),]$B),2),sep = "")
+paste("hippocampus=",round(mean(test3[grepl("hippocampus", gsub("0","0",test3$Variable)),]$B),2),"±",round(sd(test3[grepl("hippocampus", gsub("0","0",test3$Variable)),]$B),2),sep = "")
+
+test[grepl("FMAJ", test$Variable),]
+test3[grepl("FMAJ", test3$Variable),]
+
+test[grepl("FMIN", test$Variable),]
+test3[grepl("FMIN", test3$Variable),]
+
+
+
+
+
+
