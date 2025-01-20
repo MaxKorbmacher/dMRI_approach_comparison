@@ -1,5 +1,5 @@
-# analyses to examine the extend to which DTI explains white matter microstructure
-# Max Korbmacher, 27 August 2024
+# Analyses comparing differen white matter microstructure models' associations with clinical variables of interest
+# Max Korbmacher, 20 Jan 2025
 #
 # R version: 4.2.1
 #
