@@ -26,7 +26,7 @@ pacman::p_load(ggplot2, fastICA, reshape2, ggpubr,
                patchwork, factoextra, stats, 
                lmerTest, graphics,rlist,pwr,
                viridis,cowplot,neuroCombat,caret,
-               PCAtest,pscl,
+               PCAtest,pscl,rstatix,
                update = F)
 #
 # load data
@@ -274,20 +274,23 @@ rm(mean_list,plot3)
 #   (2) the statistical significance of each PC, and 
 #   (3) the contribution of each observed variable to each significant PC. (although this last point is not used)
 # This was done one-by-one:
+#
+# UNTICK FOR CHECKS
+#
 ## UKB
 result = PCAtest(ukb %>% select(starts_with("rk"), starts_with("ak"), starts_with("mk")),100,100,0.05)
-result = PCAtest(ukb %>% select(starts_with("rd"), starts_with("ad"), starts_with("md"), starts_with("fa")),100,100,0.05)
-result = PCAtest(ukb %>% select(starts_with("v_"), starts_with("micro"), starts_with("Drad"), starts_with("Dax")),10,10,0.05)
-result = PCAtest(ukb %>% select(starts_with("smt_md"), starts_with("smt_long")),100,100,0.05)
-result = PCAtest(ukb %>%select(starts_with("smt_mc")),100,100,0.05)
-result = PCAtest(ukb %>%select(starts_with("axEAD"), starts_with("radEAD")),100,100,0.05)
+# result = PCAtest(ukb %>% select(starts_with("rd"), starts_with("ad"), starts_with("md"), starts_with("fa")),100,100,0.05)
+# result = PCAtest(ukb %>% select(starts_with("v_"), starts_with("micro"), starts_with("Drad"), starts_with("Dax")),10,10,0.05)
+# result = PCAtest(ukb %>% select(starts_with("smt_md"), starts_with("smt_long")),100,100,0.05)
+# result = PCAtest(ukb %>%select(starts_with("smt_mc")),100,100,0.05)
+# result = PCAtest(ukb %>%select(starts_with("axEAD"), starts_with("radEAD")),100,100,0.05)
 ## ABCD
 result = PCAtest(abcd %>% select(starts_with("rk"), starts_with("ak"), starts_with("mk")),100,100,0.05)
-result = PCAtest(abcd %>% select(starts_with("rd"), starts_with("ad"), starts_with("md"), starts_with("fa")),100,100,0.05)
-result = PCAtest(abcd %>% select(starts_with("v_"), starts_with("micro"), starts_with("Drad"), starts_with("Dax")),10,10,0.05)
-result = PCAtest(abcd %>% select(starts_with("smt_md"), starts_with("smt_long")),100,100,0.05) # only 3 sig
-result = PCAtest(abcd %>%select(starts_with("smt_mc")),100,100,0.05)
-result = PCAtest(abcd %>%select(starts_with("axEAD"), starts_with("radEAD")),100,100,0.05)
+# result = PCAtest(abcd %>% select(starts_with("rd"), starts_with("ad"), starts_with("md"), starts_with("fa")),100,100,0.05)
+# result = PCAtest(abcd %>% select(starts_with("v_"), starts_with("micro"), starts_with("Drad"), starts_with("Dax")),10,10,0.05)
+# result = PCAtest(abcd %>% select(starts_with("smt_md"), starts_with("smt_long")),100,100,0.05) # only 3 sig
+# result = PCAtest(abcd %>%select(starts_with("smt_mc")),100,100,0.05)
+# result = PCAtest(abcd %>%select(starts_with("axEAD"), starts_with("radEAD")),100,100,0.05)
 #
 #
 # estimate principal components and visualise the first 10 components
@@ -653,7 +656,7 @@ for (i in 1:length(ukb_pc)){
     df = cbind(ukb%>%select(c(eid,age,sex,scanner,CortexVol)),ukb_pc[[i]])
     m = glm(sex~PC1+PC2+PC3+PC4+PC5+CortexVol+age+scanner, family = "binomial", data = df)
     out[[i]] = varImp(m)[1:7,]
-    df = cbind(abcd%>%select(c(eid,age,sex,scanner,CortexVol)),abcd[[i]])
+    df = cbind(abcd%>%select(c(eid,age,sex,scanner,CortexVol)),abcd_pc[[i]])
     m = glm(sex~PC1+PC2+PC3+PC4+PC5+CortexVol+age+scanner, family = "binomial", data = df)
     out2[[i]] = varImp(m)[1:7,]
 }
@@ -872,7 +875,7 @@ age_rmse = merge(list.rbind(age_pred(ukb, ukb_val,ukb_pc,ukb_test_loadings,"UKB"
                   list.rbind(age_pred(abcd, abcd_val,abcd_pc,abcd_test_loadings,"ABCD")),
                   by = "Model"
 )
-age_rmse
+age_rmse # added as a supplement
 
 # Skeleton level age associations
 res = list()
@@ -923,3 +926,107 @@ p3 = ggplot(res[[3]], aes(x=Data, y=Metric)) +
 #plot10 = ggarrange(p1,p2,p3,nrow=1, common.legend = T, legend = "bottom") #c("UKB", "ABCD", "Both")
 plot11=plot_grid(p1,p2,p3,nrow=1, align="v")
 ggsave(paste(PATH,"Figures/age_plot_skeleton.pdf",sep=""),plot11,width=11,height=5)
+#
+# HIPPOCAMPUS tract level associations
+# define hippo tracts
+preds = abcd %>% select(contains("hippo")) %>% names
+preds = preds[!grepl("awf",preds)]
+res = res2 = list()
+# predict for training data
+tract_list = list(abcd,ukb)
+Beta=SE=p=c()
+for (df in 1:length(tract_list)){
+  for (i in 1:length(preds)){
+    tmp_dat = stand(tract_list[[df]])
+    tmp_dat$age = scale(tmp_dat$age)
+    f1 = formula(paste("age~",preds[i],"+age+sex+scanner+CortexVol",sep="")) # regular linear models used due to singular fit
+    m1 = lm(f1, data=tmp_dat)
+    Beta[i] = lm.beta::lm.beta(m1)$coefficients[2]
+    #SE[i] = summary(m1)$coefficients[3,2] # not necessary for the plotting
+    p[i] = summary(m1)$coefficients[2,4]
+  }
+  res[[df]] = data.frame(preds, Beta, p) #SE
+}
+# now, do the same for test data (standardisation already done based on training data)
+# Note that these values have been standardized based on the training samples
+tract_list=list(data.frame(abcd_pc_val), data.frame(ukb_pc_val))
+orig_list=list(abcd_val,ukb_val)
+for (df in 1:length(tract_list)){
+  for (i in 1:length(preds)){
+    tmp_dat = cbind(orig_list[[df]] %>% select(age,sex,scanner,CortexVol), tract_list[[df]])
+    tmp_dat$age = scale(tmp_dat$age)
+    f1 = formula(paste("age~",preds[i],"+age+sex+scanner+CortexVol",sep="")) # regular linear models used due to singular fit
+    m1 = lm(f1, data=tmp_dat)
+    Beta[i] = lm.beta::lm.beta(m1)$coefficients[2]
+    #SE[i] = summary(m1)$coefficients[3,2] # not necessary for the plotting
+    p[i] = summary(m1)$coefficients[2,4]
+  }
+  res2[[df]] = data.frame(preds, Beta, p) #SE
+}
+sum((res[[1]]$Beta > 0) == (res2[[1]]$Beta > 0))/nrow(res[[1]])
+sum((res[[2]]$Beta > 0) == (res2[[2]]$Beta > 0))/nrow(res[[2]])
+
+mean(abs(res[[1]]$Beta))
+mean(abs(res2[[1]]$Beta))
+
+mean(abs(res[[2]]$Beta))
+mean(abs(res2[[2]]$Beta))
+#
+#
+# 7. ASYMMETRIES ######
+left = ukb %>% select(-CortexVol) %>% select(ends_with("L")) %>% names
+right = ukb %>% select(-scanner) %>% select(ends_with("R")) %>% names
+dflist = list(ukb,ukb_val,abcd,abcd_val)
+the_result = list()
+for (j in 1:length(dflist)){
+  resu = list()
+  data = dflist[[j]]
+  for (i in 1:length(left)){
+    tmp = data.frame(value = c(unlist(data[left[i]]), unlist(data[right[i]])),
+                     hemi = c(replicate(nrow(data),"left"),replicate(nrow(data),"right")))
+    d = cohens_d(formula = value~hemi,data = tmp)$effsize # NOTE: THIS IS LEFT MINUS RIGHT!
+    t = t.test(value~hemi,tmp)$p.value # This is the p-val only
+    resu[[i]] = data.frame(Name = left[i], Cohens_d = d,p = t)
+  }
+  the_result[[j]] = resu
+}
+deps = c("BRIA-Vintra", "BRIA-vextra", "BRIA-vCSF", "BRIA-microRD", "BRIA-microFA", 
+         "BRIA-microAX", "BRIA-microADC", "BRIA-DRADextra", "BRIA-DAXintra", "BRIA-DAXextra",
+         "DKI-MK", "DKI-RK", "DKI-AK", "DTI-FA", "DTI-MD", "DTI-RD", "DTI-AD", 
+         "SMT-long", "SMT-MD", "SMTmc-intra", "SMTmc-extraMD", "SMTmc-extratrans",
+         "SMTmc-Diff", "WMTI-axEAD", "WMTI-AWF", "WMTI-radEAD")
+ukb_hemi = list.rbind(the_result[[1]])
+ukb_val_hemi = list.rbind(the_result[[2]])
+abcd_hemi = list.rbind(the_result[[3]])
+abcd_val_hemi = list.rbind(the_result[[4]])
+#hemilist = list(ukb_hemi,ukb_val_hemi,abcd_hemi,abcd_val_hemi) # put them all together into a list
+# define metric names in a plot-friendly way
+ukb_hemi$Metric = ukb_val_hemi$Metric = abcd_hemi$Metric = abcd_val_hemi$Metric = deps
+# define tract names in a plot-friendly way
+## this defines the tracts
+gsub("L","",gsub("microFA_","",ukb_hemi$Name[grepl("microFA_",ukb_hemi$Name)]))
+## yet, the formatting is not perfect, hence done by hand:
+ukb_hemi$Tract = ukb_val_hemi$Tract = abcd_hemi$Tract = abcd_val_hemi$Tract = 
+  c(replicate(length(deps),"ATR"),
+    replicate(length(deps),"CST"),
+    replicate(length(deps),"CG"),
+    replicate(length(deps),"CG-hippocampus"),
+    replicate(length(deps),"IFOF"),
+    replicate(length(deps),"ILF"),
+    replicate(length(deps),"SLF"),
+    replicate(length(deps),"UF"),
+    replicate(length(deps),"SLFT"))
+# Make a plotting function
+plot_hemi = function(title,data_hemi){
+    p=ggplot(data_hemi, aes(x=Metric, y=Tract)) +
+    geom_tile(colour="black", size=0.25, aes(fill=Cohens_d)) +
+    scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white") +
+    #breaks = c(-1, -0.5, 0, 0.25, 0.5, 1)) +
+    geom_text(aes(label=round(Cohens_d,2)),size=4)+
+    theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
+  p = p+theme(axis.text.x = element_text(size = 8, angle = 90))+ggtitle(title)
+  return(p)
+}
+hemiplots = list(plot_hemi("UKB  training",ukb_hemi),plot_hemi("UKB validation",ukb_val_hemi),
+                 plot_hemi("ABCD training",abcd_hemi),plot_hemi("ABCD validation",abcd_val_hemi))
+ggarrange(plotlist = hemiplots)
