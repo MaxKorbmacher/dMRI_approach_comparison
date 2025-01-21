@@ -1,4 +1,5 @@
-# analyse new pgrs estimates
+# analyse new pgrs estimates' associations with white matter microstructure
+# show also bmi and pulse pressure associations
 # Max Korbmacher, 20 Jan 2025
 #
 #
@@ -104,7 +105,7 @@ for(i in 1:length(data)){
   PC[[i]]$eid = data[[i]]$eid
   PC[[i]] = merge(PC[[i]],demo[[i]],by="eid")
   PC[[i]] = merge(PC[[i]],pgrs[[i]],by="eid")
-  #d=data[[i]]%>%select(eid,age,sex,scanner) # in case the full data frame (containign all teh tract metrics) is used
+  #d=data[[i]]%>%select(eid,age,sex,scanner) # in case the full data frame (containing all the tract metrics) is used
   PC[[i]] = merge(PC[[i]],data[[i]],by="eid")
   # add pgrs pc
   psypc = PC[[i]][pgrs_names] %>% prcomp(scale. = T, center = T) # psychiatric disorder pc
@@ -176,7 +177,7 @@ ds=list.rbind(ds)
 ds[,2:5] = round(ds[,2:5],4)
 ds$data = c(replicate((nrow(ds))/2,"UKB"),replicate((nrow(ds))/2,"ABCD"))
 write.csv(x = ds,file = paste(PATH,"Tables/diff_pgrs_TESTSET.csv",sep=""))
-
+#
 # mean(unlist(pgrs[[l]][pgrs_names][i])) # for ref of the direction of effects. This is the population.
 # mean(unlist(PC[[l]][pgrs_names][i])) # This is the imaging sample
 #
@@ -203,7 +204,7 @@ for (i in 1:length(mean_dat)){
   for (j in 1:length(skeleton_metrics)){
     res22 = res11 = c()
     for (k in 1:length(pgrs_names)){
-      f1=formula(paste(pgrs_names[k],"~scale(",skeleton_metrics[j],")+age+sex+scanner+ethnicity",sep="")) # formula for skeleton mean associations
+      f1=formula(paste(pgrs_names[k],"~scale(",skeleton_metrics[j],")+age+sex+scanner+ethnicity+CortexVol",sep="")) # formula for skeleton mean associations
       m=lm(f1,data=mean_dat[[i]])
       res11[k] = summary(m)$coefficients[2]
       res22[k] =summary(m)$coefficients[2,4]
@@ -230,7 +231,7 @@ res02$Group = res$Group = c(paste("UKB-Train-",rownames(res02)[1:(length(pgrs_na
                             paste("ABCD-Test-",rownames(res02)[1:(length(pgrs_names))],sep=""))# c("UKB-PsyPC","UKB-AD","ABCD-PsyPC","ABCD-AD")
 res=melt(res)
 res02=melt(res02)
-res02$cor_p = res02$value*708
+res02$cor_p = res02$value*699
 names(res02) = c("Group","Metric","p","p_corrected")
 names(res)=c("Group","Metric","Beta")
 left_join(res,res02,by=c("Group","Metric")) %>%filter(p_corrected<.05) # show the metrics that survived multiple comparison
@@ -299,8 +300,8 @@ p2=ggplot((r2), aes(x=variable, y=PGRS)) +
 p2 = annotate_figure(p2, top = text_grob("ABCD Training", rot = 0))
 #
 # check sig
-melt(res02[[1]]) %>% filter(value<.05/708)
-melt(res02[[2]]) %>% filter(value<.05/708)
+melt(res02[[1]]) %>% filter(value<.05/699)
+melt(res02[[2]]) %>% filter(value<.05/699)
 #
 #
 #
@@ -322,7 +323,7 @@ PC2 = list(data.frame(BRIA = ukb_test_loadings[[1]]$PC1,
 PC2[[1]] = cbind(PC2[[1]],ukb_mean_val)
 PC2[[2]] = cbind(PC2[[2]],abcd_mean_val)
 PC2[[1]] = join_all(list(PC2[[1]],ukb.pgrs, ukb, ukb.demo), by='eid', type='left')
-PC2[[2]] = join_all(list(PC2[[2]],abcd.pgrs,abcd.demo), by='eid', type='left')
+PC2[[2]] = join_all(list(PC2[[2]],abcd.pgrs,abcd, abcd.demo), by='eid', type='left')
 diffusion_components=names(PC2[[1]])[1:6]
 res02=res=list() # empty list to be filled by loop
 for (i in 1:length(PC2)){
@@ -364,5 +365,229 @@ p002 = annotate_figure(p002, top = text_grob("ABCD Test", rot = 0))
 p3 = ggarrange(p1,p2,p001,p002,common.legend = F)
 ggsave(paste(PATH,"Figures/PGRS_WM_PC.pdf",sep=""),p3,width=12,height=4)
 #
-melt(res02[[1]]) %>% filter(value<.05/708)
-melt(res02[[2]]) %>% filter(value<.05/708)
+melt(res02[[1]]) %>% filter(value<.05/699)
+melt(res02[[2]]) %>% filter(value<.05/699)
+#
+#
+# UKB traning L + R inferior fronto-orbital fasciculus
+(lm.beta::lm.beta(lm(BIP ~ mk_IFOFL+scanner+sex+age+ethnicity+CortexVol,PC[[1]])))$standardized.coefficients[2]
+lm.beta::lm.beta(lm(BIP ~ mk_IFOFR+scanner+sex+age+ethnicity+CortexVol,PC[[1]]))$standardized.coefficients[2]
+# ABCD training
+lm.beta::lm.beta(lm(BIP ~ mk_IFOFL+scanner+sex+age+ethnicity+CortexVol,PC[[2]]))$standardized.coefficients[2]
+lm.beta::lm.beta(lm(BIP ~ mk_IFOFR+scanner+sex+age+ethnicity+CortexVol,PC[[2]]))$standardized.coefficients[2]
+# ukb val
+ukb_val2 = merge(ukb_val,ukb.pgrs,by="eid")
+lm.beta::lm.beta(lm(BIP ~ mk_IFOFL+scanner+sex+age+ethnicity+CortexVol,
+                    merge(ukb_val2,ukb.demo,by="eid")))$standardized.coefficients[2]
+lm.beta::lm.beta(lm(BIP ~ mk_IFOFR+scanner+sex+age+ethnicity+CortexVol,
+                    merge(ukb_val2,ukb.demo,by="eid")))$standardized.coefficients[2]
+# abcd val
+abcd_val2 = merge(abcd_val,abcd.pgrs,by="eid")
+lm.beta::lm.beta(lm(BIP ~ mk_IFOFL+scanner+sex+age+ethnicity+CortexVol,
+                    merge(abcd_val2,abcd.demo,by="eid")))$standardized.coefficients[2]
+lm.beta::lm.beta(lm(BIP ~ mk_IFOFR+scanner+sex+age+ethnicity+CortexVol,
+                    merge(abcd_val2,abcd.demo,by="eid")))$standardized.coefficients[2]
+#
+# SLF
+# UKB Train
+(lm.beta::lm.beta(lm(BIP ~ mk_SLFL+scanner+sex+age+ethnicity+CortexVol,PC[[1]])))$standardized.coefficients[2]
+(lm.beta::lm.beta(lm(BIP ~ mk_SLFR+scanner+sex+age+ethnicity+CortexVol,PC[[1]])))$standardized.coefficients[2]
+# ABCD Train
+(lm.beta::lm.beta(lm(BIP ~ mk_SLFL+scanner+sex+age+ethnicity+CortexVol,PC[[2]])))$standardized.coefficients[2]
+(lm.beta::lm.beta(lm(BIP ~ mk_SLFR+scanner+sex+age+ethnicity+CortexVol,PC[[2]])))$standardized.coefficients[2]
+# ukb val
+lm.beta::lm.beta(lm(BIP ~ mk_SLFL+scanner+sex+age+ethnicity+CortexVol,
+                    merge(ukb_val2,ukb.demo,by="eid")))$standardized.coefficients[2]
+lm.beta::lm.beta(lm(BIP ~ mk_SLFR+scanner+sex+age+ethnicity+CortexVol,
+                    merge(ukb_val2,ukb.demo,by="eid")))$standardized.coefficients[2]
+# abcd val
+lm.beta::lm.beta(lm(BIP ~ mk_SLFL+scanner+sex+age+ethnicity+CortexVol,
+                    merge(abcd_val2,abcd.demo,by="eid")))$standardized.coefficients[2]
+lm.beta::lm.beta(lm(BIP ~ mk_SLFR+scanner+sex+age+ethnicity+CortexVol,
+                    merge(abcd_val2,abcd.demo,by="eid")))$standardized.coefficients[2]
+#
+### BMI & PP #######
+#
+# Population vs present sample ####
+
+########### PP
+# ABCD Training
+cohen.d(PC[[2]]$PP,
+        abcd.demo[!abcd.demo$eid %in% PC[[1]]$eid | abcd.demo$eid %in% PC2[[1]]$eid,]$PP,
+        na.rm=T)
+t.test(PC[[2]]$PP,
+       abcd.demo[!abcd.demo$eid %in% PC[[1]]$eid | abcd.demo$eid %in% PC2[[1]]$eid,]$PP,
+       na.rm=T)$p.value
+# UKB Training
+cohen.d(PC[[1]]$PP,
+        ukb.demo[!ukb.demo$eid %in% PC[[1]]$eid | ukb.demo$eid %in% PC2[[1]]$eid,]$PP,
+        na.rm=T)
+t.test(PC[[1]]$PP,
+       ukb.demo[!ukb.demo$eid %in% PC[[1]]$eid | ukb.demo$eid %in% PC2[[1]]$eid,]$PP,
+       na.rm=T)$p.value
+# ABCD Testing
+cohen.d(PC2[[2]]$PP,
+        abcd.demo[!abcd.demo$eid %in% PC[[1]]$eid | abcd.demo$eid %in% PC2[[1]]$eid,]$PP,
+        na.rm=T)
+t.test(PC2[[2]]$PP,
+       abcd.demo[!abcd.demo$eid %in% PC[[1]]$eid | abcd.demo$eid %in% PC2[[1]]$eid,]$PP,
+       na.rm=T)$p.value
+# UKB Testing
+cohen.d(PC2[[1]]$PP,
+        ukb.demo[!ukb.demo$eid %in% PC[[1]]$eid | ukb.demo$eid %in% PC2[[1]]$eid,]$PP,
+        na.rm=T)
+t.test(PC2[[1]]$PP,
+       ukb.demo[!ukb.demo$eid %in% PC[[1]]$eid | ukb.demo$eid %in% PC2[[1]]$eid,]$PP,
+       na.rm=T)$p.value
+
+########### BMI
+# ABCD Training
+cohen.d(PC[[2]]$BMI,
+        abcd.demo[!abcd.demo$eid %in% PC[[1]]$eid | abcd.demo$eid %in% PC2[[1]]$eid,]$BMI,
+        na.rm=T)
+t.test(PC[[2]]$BMI,
+       abcd.demo[!abcd.demo$eid %in% PC[[1]]$eid | abcd.demo$eid %in% PC2[[1]]$eid,]$BMI,
+       na.rm=T)$p.value
+# UKB Training
+cohen.d(PC[[1]]$BMI,
+        ukb.demo[!ukb.demo$eid %in% PC[[1]]$eid | ukb.demo$eid %in% PC2[[1]]$eid,]$BMI,
+        na.rm=T)
+t.test(PC[[1]]$BMI,
+        ukb.demo[!ukb.demo$eid %in% PC[[1]]$eid | ukb.demo$eid %in% PC2[[1]]$eid,]$BMI,
+        na.rm=T)$p.value
+# ABCD Testing
+cohen.d(PC2[[2]]$BMI,
+        abcd.demo[!abcd.demo$eid %in% PC[[1]]$eid | abcd.demo$eid %in% PC2[[1]]$eid,]$BMI,
+        na.rm=T)
+t.test(PC2[[2]]$BMI,
+       abcd.demo[!abcd.demo$eid %in% PC[[1]]$eid | abcd.demo$eid %in% PC2[[1]]$eid,]$BMI,
+       na.rm=T)$p.value
+# UKB Testing
+cohen.d(PC2[[1]]$BMI,
+        ukb.demo[!ukb.demo$eid %in% PC[[1]]$eid | ukb.demo$eid %in% PC2[[1]]$eid,]$BMI,
+        na.rm=T)
+t.test(PC2[[1]]$BMI,
+       ukb.demo[!ukb.demo$eid %in% PC[[1]]$eid | ukb.demo$eid %in% PC2[[1]]$eid,]$BMI,
+       na.rm=T)$p.value
+#
+# Skeleton level associations ####
+res = res02 = list()
+pgrs_names = c("BMI", "PP")
+for (i in 1:length(mean_dat)){
+  res1=res2=data.frame(matrix(ncol=length(skeleton_metrics), nrow=length(pgrs_names)))
+  for (j in 1:length(skeleton_metrics)){
+    res22 = res11 = c()
+    for (k in 1:length(pgrs_names)){
+      f1=formula(paste("scale(",pgrs_names[k],")~scale(",skeleton_metrics[j],")+age+sex+scanner+ethnicity+CortexVol",sep="")) # formula for skeleton mean associations
+      m=lm(f1,data=mean_dat[[i]])
+      res11[k] = summary(m)$coefficients[2]
+      res22[k] =summary(m)$coefficients[2,4]
+    }
+    res1[,j] = res11
+    res2[,j] = res22
+  }
+  res[[i]] = res1 # beta coefficients
+  res02[[i]] = res2 # p-values
+  names(res02[[i]])=names(res[[i]])=skeleton_metrics
+  row.names(res02[[i]])=row.names(res[[i]])=pgrs_names
+}
+res = list.rbind(res) # beta coefficients
+res02 = list.rbind(res02) # p-values
+names(res02) = names(res) = c("BRIA-Vintra", "BRIA-vextra", "BRIA-vCSF", "BRIA-microRD", "BRIA-microFA", 
+                              "BRIA-microAX", "BRIA-microADC", "BRIA-DRADextra", "BRIA-DAXintra", "BRIA-DAXextra",
+                              "DKI-MK", "DKI-RK", "DKI-AK", 
+                              "DTI-FA","DTI-MD","DTI-RD","DTI-AD",
+                              "SMT-long", "SMT-MD", "SMTmc-intra", "SMTmc-extraMD", "SMTmc-extratrans",
+                              "SMTmc-Diff", "WMTI-axEAD", "WMTI-AWF", "WMTI-radEAD")
+res02$Group = res$Group = c(paste("UKB-Train-",rownames(res02)[1:(length(pgrs_names))],sep=""),
+                            paste("UKB-Test-",rownames(res02)[1:(length(pgrs_names))],sep=""),
+                            paste("ABCD-Train-",rownames(res02)[1:(length(pgrs_names))],sep=""),
+                            paste("ABCD-Test-",rownames(res02)[1:(length(pgrs_names))],sep=""))# c("UKB-PsyPC","UKB-AD","ABCD-PsyPC","ABCD-AD")
+res=melt(res)
+res02=melt(res02)
+res02$cor_p = res02$value*699
+names(res02) = c("Group","Metric","p","p_corrected")
+names(res)=c("Group","Metric","Beta")
+left_join(res,res02,by=c("Group","Metric")) %>%filter(p_corrected<.05) # show the metrics that survived multiple comparison
+p1 = ggplot(res %>% filter(grepl("ABCD",Group)), aes(x=Metric, y=Group)) + 
+  geom_tile(colour="black", size=0.25, aes(fill=Beta)) +
+  scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white")+
+  #                       breaks = c(-0.02,-0.01, 0,0.01, 0.02)) +
+  geom_text(aes(label = round(Beta,2)))+
+  theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
+p1 = p1+theme(axis.text.x = element_text(size = 8, angle = 90))+ggtitle("ABCD")
+p2 = ggplot(res %>% filter(grepl("UKB",Group)), aes(x=Metric, y=Group)) + 
+  geom_tile(colour="black", size=0.25, aes(fill=Beta)) +
+  scale_fill_gradient2(high="#880700", low="#3a81b5", midpoint = 0, mid = "white")+
+  #                       breaks = c(-0.02,-0.01, 0,0.01, 0.02)) +
+  geom_text(aes(label = round(Beta,2)))+
+  theme(axis.text.y = element_text(size = 8)) + theme_bw() + xlab("") + ylab("")
+p2 = p2+theme(axis.text.x = element_text(size = 8, angle = 90))+ggtitle("UKB")
+p1 = ggarrange(p1,p2, ncol=1,common.legend = F,legend = "right")
+ggsave(paste(PATH,"Figures/BMI_PP_skeleton.pdf",sep=""),p1,width=14,height=8)
+#
+#
+# Check principal components
+#
+# of Training frames
+res = res02 = list()
+pgrs_names = c("BMI", "PP")
+for (i in 1:length(PC)){
+  res1=res2=data.frame(matrix(ncol=length(diffusion_components), nrow=length(pgrs_names)))
+  for (j in 1:length(diffusion_components)){
+    res22 = res11 = c()
+    for (k in 1:length(pgrs_names)){
+      f1=formula(paste("scale(",pgrs_names[k],")~scale(",diffusion_components[j],")+age+sex+scanner+ethnicity+CortexVol",sep="")) # formula for skeleton mean associations
+      m=lm(f1,data=PC[[i]])
+      res11[k] = summary(m)$coefficients[2]
+      res22[k] =summary(m)$coefficients[2,4]
+    }
+    res1[,j] = res11
+    res2[,j] = res22
+  }
+  res[[i]] = res1 # beta coefficients
+  res02[[i]] = res2 # p-values
+  names(res02[[i]])=names(res[[i]])=diffusion_components
+  row.names(res02[[i]])=row.names(res[[i]])=pgrs_names
+}
+res.1 = list.rbind(res) # beta coefficients
+res02.1 = list.rbind(res02) # p-values
+res02.1 = res02.1*699
+#
+#
+# and of test frames
+res=res02=list()
+for (i in 1:length(PC2)){
+  res1=res2=data.frame(matrix(ncol=length(diffusion_components), nrow=length(pgrs_names)))
+  for (j in 1:length(diffusion_components)){
+    res22 = res11 = c()
+    for (k in 1:length(pgrs_names)){
+      f1=formula(paste("scale(",pgrs_names[k],")~scale(",diffusion_components[j],")+age+sex+scanner+ethnicity+CortexVol",sep="")) # formula for skeleton mean associations
+      m=lm(f1,data=PC2[[i]])
+      res11[k] = summary(m)$coefficients[2]
+      res22[k] =summary(m)$coefficients[2,4]
+    }
+    res1[,j] = res11
+    res2[,j] = res22
+  }
+  res[[i]] = res1 # beta coefficients
+  res02[[i]] = res2 # p-values
+  names(res02[[i]])=names(res[[i]])=diffusion_components
+  row.names(res02[[i]])=row.names(res[[i]])=pgrs_names
+}
+res.2 = list.rbind(res) # beta coefficients
+res02.2 = list.rbind(res02) # p-values
+res02.2 = res02.2*699
+
+res02 = round(rbind(res.1,res.2),2)
+res = round(rbind(res02.1,res02.2),2)
+res02$Group = res$Group = c("UKB-Train-BMI", "UKB-Train-PP", 
+                            "ABCD-Train-BMI", "ABCD-Train-PP",
+                            "UKB-Test-BMI", "UKB-Test-PP", 
+                            "ABCD-Test-BMI", "ABCD-Test-PP")
+
+res
+#
+#
+# The conclusion is that no component replicates across data sets, but that most components predict PP in UKB
+

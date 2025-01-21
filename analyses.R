@@ -104,15 +104,15 @@ write.csv(x = abcd_mean_val,file = paste(PATH,"abcd_mean_val.csv",sep=""))
 # 0) Power #### 
 # quick and dirty power analysis for univariate associations with the lowest power
 ##ABCD data only
-pwr_out = pwr.f2.test(u = 4,v = 3691,sig.level = 0.05/708,power = .95)
+pwr_out = pwr.f2.test(u = 4,v = 3691,sig.level = 0.05/699,power = .95)
 print(paste("lowest observable f2 and R2 = ",(pwr_out$f2),"(ABCD)",sep = ""))
 print(paste("lowest observable r = ",sqrt(pwr_out$f2),"(ABCD)",sep = ""))
 ## UKB data only
-pwr_out = pwr.f2.test(u = 4,v = 29653,sig.level = 0.05/708,power = .95)
+pwr_out = pwr.f2.test(u = 4,v = 29653,sig.level = 0.05/699,power = .95)
 print(paste("lowest observable f2 and R2 = ",(pwr_out$f2),"(UKB)",sep = ""))
 print(paste("lowest observable r = ",sqrt(pwr_out$f2),"(UKB)",sep = ""))
 # ## all data
-# pwr_out = pwr.f2.test(u = 4,v = 47371,sig.level = 0.05/708,power = .95)
+# pwr_out = pwr.f2.test(u = 4,v = 47371,sig.level = 0.05/699,power = .95)
 # print(paste("lowest observable f2 and R2 = ",(pwr_out$f2),"(all data)",sep = ""))
 # print(paste("lowest observable r = ",sqrt(pwr_out$f2),"(all data)",sep = ""))
 # u = 4 for metric, sex, site, age

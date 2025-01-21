@@ -422,6 +422,9 @@ test3[grepl("FMIN", test3$Variable),]
 
 
 
-
-
+# first dki 
+test = ukbl%>%filter(Comp==1) %>% filter(Approach =="DKI") %>% mutate(B=abs(B))
+test3 = ukbl_test%>%filter(Comp==1) %>% filter(Approach =="DKI") %>% mutate(B=abs(B))
+test = abcd%>%filter(Comp==1) %>% filter(Approach =="DKI") %>% mutate(B=abs(B))
+test3 = abc_test%>%filter(Comp==1) %>% filter(Approach =="DKI") %>% mutate(B=abs(B))
 
